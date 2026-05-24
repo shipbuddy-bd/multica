@@ -1,0 +1,317 @@
+================================================================================
+MULTICA ISSUE & AGENT ARCHITECTURE - QUICK REFERENCE
+================================================================================
+
+DATABASE CORE TABLES
+====================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ISSUE TABLE                                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • id (UUID)                                                                 │
+│ • workspace_id (UUID)                                                       │
+│ • title, description                                                        │
+│ • status: backlog|todo|in_progress|in_review|done|blocked|cancelled        │
+│ • priority: urgent|high|medium|low|none                                     │
+│ • assignee_type: member|agent|squad (nullable)                              │
+│ • assignee_id (UUID, nullable)                                              │
+│ • creator_type: member|agent                                                │
+│ • creator_id (UUID)                                                         │
+│ • number: INT (per-workspace, human-readable: MUL-42)                       │
+│ • parent_issue_id (UUID, nullable) - hierarchical issues                    │
+│ • project_id (UUID, nullable)                                               │
+│ • start_date, due_date (Gantt chart support)                                │
+│ • metadata (JSONB) - flat KV map for agent pipeline state                   │
+│ • position (FLOAT) - drag-drop ordering                                     │
+│ • created_at, updated_at                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AGENT TABLE                                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • id (UUID)                                                                 │
+│ • workspace_id (UUID)                                                       │
+│ • name, description, instructions                                           │
+│ • runtime_id (UUID) - references AgentRuntime where it runs                 │
+│ • status: idle|working|blocked|error|offline                                │
+│ • runtime_mode: local|cloud                                                 │
+│ • visibility: workspace|private (access control)                            │
+│ • owner_id (UUID, nullable) - private agents only accessible to owner       │
+│ • max_concurrent_tasks (INT) - parallelization limit                        │
+│ • model (LLM: claude-opus, etc.)                                            │
+│ • thinking_level (reasoning effort: low|medium|high|max, etc.)              │
+│ • custom_env, custom_args (JSONB) - execution configuration                 │
+│ • archived_at, archived_by (soft-delete support)                            │
+│ • created_at, updated_at                                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ AGENT_TASK_QUEUE TABLE                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • id (UUID)                                                                 │
+│ • agent_id (UUID) - which agent should execute                              │
+│ • issue_id (UUID) - which issue to work on                                  │
+│ • status: queued|dispatched|running|completed|failed|cancelled              │
+│ • priority (INT)                                                            │
+│ • runtime_id (UUID) - which AgentRuntime executed it                        │
+│ • session_id (TEXT) - daemon-local session ID                               │
+│ • work_dir (TEXT) - working directory for this task                         │
+│ • context (JSONB) - snapshot of issue state + environment                   │
+│ • result, error (execution output/failure)                                  │
+│ • failure_reason - classifier: agent_error|timeout|runtime_offline|etc.     │
+│ • trigger_comment_id, trigger_summary - if @mentioned in comment            │
+│ • chat_session_id, autopilot_run_id - source tracking                       │
+│ • parent_task_id, attempt, max_attempts - retry chain support               │
+│ • dispatched_at, started_at, completed_at (timing)                          │
+│ • created_at                                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+ISSUE LIFECYCLE
+===============
+
+Creation:
+  ┌─────────────────────────────────────────────────────────────────┐
+  │ POST /api/issues                                                │
+  │ {title, description, assignee_type?, assignee_id?, status?}     │
+  └─────────────────────────────────────────────────────────────────┘
+         ↓
+  Issue created with default status: "backlog"
+         ↓
+  If assigned to agent & status != "backlog":
+    → Enqueue task in agent_task_queue (status: queued)
+    → Wake daemon with daemon:task_available event
+    ↓
+  Daemon claims task (POST /api/tasks/claim)
+    ↓
+  Daemon executes, streams progress (task:progress, task:message)
+    ↓
+  Daemon completes (POST /api/tasks/complete or /api/tasks/fail)
+    ↓
+  Server broadcasts (task:completed or task:failed)
+
+Status Flow:
+  backlog → todo → in_progress → in_review → done
+                    (implicit on first exec)
+                  ↓
+                blocked (if task fails)
+                  ↓
+                cancelled (manual abort)
+
+
+ASSIGNEE TYPES & TASK DISPATCH
+===============================
+
+member:
+  • Human user assigned
+  • No auto-execution
+  • Notification-based (inbox, comments)
+
+agent:
+  • Autonomous LLM agent
+  • Task auto-enqueued (if not in backlog)
+  • Daemon claims & executes
+  • Streams progress in real-time
+
+squad:
+  • Group of agents led by one leader
+  • Squad leader's task enqueued
+  • Leader orchestrates work among members
+
+
+WEBSOCKET EVENTS
+================
+
+Issue Lifecycle:
+  issue:created             → New issue added
+  issue:updated             → Fields changed (with delta info)
+  issue:deleted             → Issue removed
+  issue_metadata:changed    → Pipeline state KV updated
+  issue_reaction:*          → Emoji reactions
+  issue_labels:changed      → Labels attached/removed
+
+Task Lifecycle:
+  task:queued               → ∅ → queued
+  task:dispatch             → queued → dispatched (daemon claims)
+  task:progress             → In-flight execution update
+  task:message              → Tool calls, outputs
+  task:completed            → running → completed (success)
+  task:failed               → running → failed (error)
+  task:cancelled            → * → cancelled (abort)
+
+Agent Status:
+  agent:status              → Connection state changed
+  agent:created             → New agent added
+  agent:archived/restored   → Lifecycle changes
+
+Daemon Communication:
+  daemon:heartbeat          → Daemon → Server (keep-alive ~30s)
+  daemon:heartbeat_ack      → Server → Daemon (ack + pending work)
+
+
+FRONTEND TYPES
+==============
+
+Issue {
+  id, workspace_id, number, identifier (e.g., "MUL-42")
+  title, description
+  status, priority
+  assignee_type, assignee_id
+  creator_type, creator_id
+  parent_issue_id, project_id
+  start_date, due_date
+  position (ordering)
+  metadata (flat KV, always present as {})
+  reactions?, labels?
+  created_at, updated_at
+}
+
+Agent {
+  id, workspace_id, runtime_id
+  name, description, instructions
+  status (idle|working|blocked|error|offline)
+  runtime_mode, visibility
+  owner_id, max_concurrent_tasks
+  model, thinking_level
+  custom_env, custom_args
+  skills
+  archived_at, archived_by
+  created_at, updated_at
+}
+
+AgentTask {
+  id, agent_id, runtime_id
+  issue_id (empty "" when no linked issue)
+  status, priority
+  dispatched_at, started_at, completed_at
+  result, error, failure_reason
+  chat_session_id, autopilot_run_id (source tracking)
+  parent_task_id, attempt, max_attempts (retries)
+  trigger_comment_id, trigger_summary (@mention source)
+  kind (comment|autopilot|chat|quick_create|direct)
+  work_dir (daemon-assigned)
+  created_at
+}
+
+
+ISSUE METADATA (Pipeline State)
+================================
+
+Flat KV store for agents to record execution state without modifying
+core issue fields. Always present (empty {} when unset).
+
+Example:
+  {
+    "pr_number": "12345",
+    "pr_url": "https://github.com/org/repo/pull/12345",
+    "pipeline_status": "passed",
+    "waiting_on": "code_review",
+    "ci_run_id": "run-789",
+    "commit_sha": "abc123"
+  }
+
+Constraints:
+  • Flat structure only (no nested objects)
+  • Primitive values only (string | number | boolean)
+  • Updated via: PATCH /api/issues/{id}/metadata
+
+
+KEY API HANDLERS
+================
+
+Issue CRUD:
+  POST   /api/issues                    → Create
+  GET    /api/issues/:id                → Read
+  GET    /api/issues?...                → List (with filters)
+  PATCH  /api/issues/:id                → Update
+  PATCH  /api/issues?ids=...            → Batch update
+  DELETE /api/issues/:id                → Delete
+
+Agent Management:
+  POST   /api/agents                    → Create
+  GET    /api/agents/:id                → Read
+  GET    /api/agents                    → List
+  PATCH  /api/agents/:id                → Update
+  GET    /api/agents/:id/tasks          → Get agent's tasks
+
+Task Management (Daemon):
+  POST   /api/tasks/claim?runtime_id=...     → Daemon claims next task
+  POST   /api/tasks/{id}/start               → Daemon reports start
+  POST   /api/tasks/{id}/complete            → Daemon reports success
+  POST   /api/tasks/{id}/fail                → Daemon reports failure
+  POST   /api/tasks/{id}/cancel              → Cancel a task
+
+
+DATABASE INDEXES
+================
+
+issue:
+  • idx_issue_workspace (workspace_id)
+  • idx_issue_status (workspace_id, status)
+  • idx_issue_assignee (assignee_type, assignee_id)
+  • uq_issue_workspace_number (workspace_id, number) UNIQUE
+  • idx_issue_parent (parent_issue_id)
+
+agent_task_queue:
+  • idx_agent_task_queue_agent (agent_id, status)
+  • idx_agent_task_queue_pending (agent_id, priority DESC, created_at ASC)
+    WHERE status IN ('queued', 'dispatched')
+
+
+DEPLOYMENT FILES
+================
+
+Backend:
+  server/migrations/001_init.up.sql              Initial schema
+  server/migrations/020_issue_number.up.sql      Human-readable IDs
+  server/migrations/091_issue_start_date.up.sql  Gantt support
+  server/pkg/db/generated/models.go              Go models
+  server/pkg/db/queries/issue.sql                SQL queries
+  server/internal/handler/issue.go               Issue endpoints
+  server/internal/service/task.go                Task logic
+  server/pkg/protocol/events.go                  Event types
+  server/pkg/protocol/messages.go                Message payloads
+  server/internal/realtime/hub.go                WebSocket hub
+
+Frontend:
+  packages/core/types/issue.ts                   Issue type
+  packages/core/types/agent.ts                   Agent type
+  packages/core/issues/stores/                   State management
+  e2e/issues.spec.ts                             End-to-end tests
+
+
+KEY DESIGN PRINCIPLES
+====================
+
+1. Task-Driven Execution:
+   - Issues don't auto-execute; only when assigned to agent
+   - "Backlog" is parking lot: stay there until explicitly moved
+   - Enqueuing only happens when both assignee AND status conditions met
+
+2. Isolation & Snapshots:
+   - Task context snapshotted at creation (no fetch-on-demand)
+   - Daemon has everything needed: issue state, env vars, instructions
+   - Task can execute even if issue is deleted (context persists)
+
+3. Flat Metadata for Pipeline State:
+   - Agents record state in issue.metadata (not title/description)
+   - Simple to search/filter by pipeline state
+   - Survives issue deletion (snapshot in task.context)
+
+4. Real-Time Synchronization:
+   - All changes broadcast via WebSocket
+   - Delta-based updates (what changed, not full object)
+   - Clients merge updates into cache without refetch
+
+5. Retry Support:
+   - Tasks can link to parent_task_id (retry chain)
+   - Attempt counter enables exponential backoff
+   - Failure reason classifier aids debugging
+
+6. Daemon Responsiveness:
+   - Heartbeat every ~30s keeps agent status up-to-date
+   - Task dispatch can be proactive (server → daemon)
+   - No polling fallback for real-time task availability
+
+
+================================================================================

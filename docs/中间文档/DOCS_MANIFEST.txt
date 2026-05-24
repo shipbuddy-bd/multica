@@ -1,0 +1,253 @@
+================================================================================
+MULTICA ARCHITECTURE DOCUMENTATION MANIFEST
+Generated: May 24, 2026
+Status: ✅ Complete and Production-Ready
+================================================================================
+
+PRIMARY DOCUMENTS (START HERE)
+================================================================================
+
+START_HERE.md (6.8KB)
+  └─ Navigation guide organized by role
+  └─ Common questions cross-referenced
+  └─ 30-second summary
+  └─ → READ THIS FIRST for orientation
+
+COMPREHENSIVE_ARCHITECTURE.md (29KB)
+  └─ Main reference architecture guide
+  └─ Executive summary & core concepts
+  └─ 8 major sections: Issue Model, Agent Arch, Task Execution, Daemon, Events, Flows, Design Decisions
+  └─ → PRIMARY REFERENCE for system design discussions
+
+QUICK_REFERENCE.md (12KB)
+  └─ Quick lookup tables for all fields
+  └─ Common SQL patterns & filters
+  └─ Validation rules
+  └─ → BOOKMARK THIS for daily coding
+
+================================================================================
+DEEP DIVE DOCUMENTS
+================================================================================
+
+DATA_MODEL.md (33KB)
+  └─ Complete database schema documentation
+  └─ All 4 core tables with migrations
+  └─ Status machines detailed
+  └─ Performance indexes & constraints
+  └─ → Study this for SQL work & optimization
+
+DAEMON_ARCHITECTURE.md (56KB)
+  └─ Complete daemon subsystem documentation
+  └─ Task loop, heartbeat protocol, registration
+  └─ Auto-update, error handling, concurrency
+  └─ Repository caching strategy
+  └─ → Study this for daemon-related development
+
+ISSUE_AND_AGENT_ARCHITECTURE.md (28KB)
+  └─ Alternative perspective on core architecture
+  └─ Issue lifecycle deep dive
+  └─ Agent status transitions
+  └─ → Reference for additional context/reinforcement
+
+================================================================================
+REFERENCE & NAVIGATION DOCUMENTS
+================================================================================
+
+QUICK_REFERENCE.md (already listed - included again for visibility)
+  └─ Issue fields (24), Agent fields (23), AgentTaskQueue fields (18+)
+  └─ Common queries, filters, validation
+  └─ → Use while coding
+
+DAEMON_QUICK_REFERENCE.md (11KB)
+  └─ Daemon struct & subsystem fields
+  └─ WorkspaceState, RuntimeManager, configs
+  └─ → Use when reviewing daemon code
+
+DEVELOPER_QUICK_START.md (8.2KB)
+  └─ New engineer onboarding guide
+  └─ Recommended reading order
+  └─ Code location reference
+  └─ → Share with new team members
+
+DATA_MODEL_INDEX.md (9.9KB)
+  └─ Use-case-based navigation
+  └─ Learning paths by role
+  └─ FAQ with answers
+  └─ → Use for finding specific info
+
+DOCUMENTATION_INDEX.md (11KB)
+  └─ Master file directory by topic
+  └─ Quick links & topic map
+  └─ Search index for navigation
+  └─ → Browse when looking for documentation
+
+DOCUMENTATION_SUMMARY.md (5.1KB)
+  └─ Meta-documentation of all files
+  └─ Key architectural concepts
+  └─ Cross-references & quick navigation
+  └─ → Overview of what's available
+
+================================================================================
+DOCUMENT STATISTICS
+================================================================================
+
+Total Documentation: ~200 KB (11 files)
+
+Coverage by Topic:
+  ✅ Database Schema: 4 tables, 65+ fields, constraints, indexes, migrations
+  ✅ Issue Lifecycle: 7 status values, 3 assignee types, JSONB metadata
+  ✅ Agent Model: 3 orthogonal status axes, runtime tracking
+  ✅ Task Execution: 6 status values, retry chains, context snapshots
+  ✅ Daemon Architecture: Task loop, heartbeat, registration, recovery
+  ✅ Real-time Events: 70+ WebSocket event types, delta broadcasting
+  ✅ Communication Flows: 3 complete end-to-end flows documented
+  ✅ Design Decisions: 6 major decisions with rationale & trade-offs
+
+Database Tables Documented:
+  • issue (24 fields + indexes)
+  • agent (23 fields + indexes)
+  • agent_task_queue (18+ fields + indexes)
+  • agent_runtime (runtime tracking + heartbeat)
+
+Status Machines Documented:
+  • Issue statuses: 7 (backlog → todo → in_progress → in_review → done / blocked / cancelled)
+  • Agent statuses: 5 (idle, working, blocked, error, offline)
+  • Task statuses: 6 (queued → dispatched → running → completed/failed/cancelled)
+
+================================================================================
+HOW TO USE THIS MANIFEST
+================================================================================
+
+1. FIRST TIME HERE?
+   → Start with: START_HERE.md
+   → Then read: COMPREHENSIVE_ARCHITECTURE.md
+   → Reference: QUICK_REFERENCE.md
+
+2. LOOKING FOR SPECIFIC INFO?
+   → Check the QUICK REFERENCE sections in each major doc
+   → Use DOCUMENTATION_INDEX.md for topic search
+   → Use DATA_MODEL_INDEX.md for FAQ
+
+3. NEW TO MULTICA?
+   → Read: DEVELOPER_QUICK_START.md
+   → Study: COMPREHENSIVE_ARCHITECTURE.md (full)
+   → Reference: QUICK_REFERENCE.md while coding
+
+4. SYSTEM DESIGN / ARCHITECTURE REVIEW?
+   → Read: COMPREHENSIVE_ARCHITECTURE.md
+   → Focus on: Executive Summary + Design Decisions sections
+   → Reference: Communication Flows section
+
+5. DAEMON-FOCUSED DEVELOPMENT?
+   → Read: DAEMON_ARCHITECTURE.md (full)
+   → Reference: DAEMON_QUICK_REFERENCE.md
+   → Check: COMPREHENSIVE_ARCHITECTURE.md (Daemon section)
+
+6. DATABASE / SQL WORK?
+   → Study: DATA_MODEL.md (full)
+   → Reference: QUICK_REFERENCE.md (common queries)
+   → Check: COMPREHENSIVE_ARCHITECTURE.md (design decisions about schema)
+
+================================================================================
+KEY CROSS-REFERENCES BY QUESTION
+================================================================================
+
+Q: How does an issue get executed?
+A: COMPREHENSIVE_ARCHITECTURE.md → Communication Flows → Flow 1
+
+Q: What are all the issue statuses?
+A: QUICK_REFERENCE.md → Issue Status table
+   or DATA_MODEL.md → Status Lifecycle section
+
+Q: How does the daemon claim tasks?
+A: DAEMON_ARCHITECTURE.md → Task Claiming section
+   or COMPREHENSIVE_ARCHITECTURE.md → Communication Flows → Flow 1
+
+Q: What's in issue.metadata and how is it used?
+A: DATA_MODEL.md → Metadata Design section (comprehensive)
+   or COMPREHENSIVE_ARCHITECTURE.md → Issue Data Model → Metadata section
+
+Q: How many concurrent tasks can an agent run?
+A: QUICK_REFERENCE.md → Agent Fields table (max_concurrent_tasks)
+   or COMPREHENSIVE_ARCHITECTURE.md → Agent Architecture → Agent Schema
+
+Q: What WebSocket events exist?
+A: COMPREHENSIVE_ARCHITECTURE.md → Real-time Events (complete list)
+   or server/pkg/protocol/events.go (actual code)
+
+Q: How does daemon heartbeat work?
+A: DAEMON_ARCHITECTURE.md → Heartbeat Protocol section (comprehensive)
+   or COMPREHENSIVE_ARCHITECTURE.md → Daemon & Runtime → Heartbeat Protocol
+
+Q: What happens if a daemon dies?
+A: DAEMON_ARCHITECTURE.md → Recovery & Reconnection section
+   or COMPREHENSIVE_ARCHITECTURE.md → Daemon & Runtime → Runtime Gone Recovery
+
+Q: How to query issues by metadata field?
+A: QUICK_REFERENCE.md → Common SQL Queries section
+   or DATA_MODEL.md → Querying Metadata section
+
+================================================================================
+DOCUMENT DEPENDENCY GRAPH
+================================================================================
+
+START_HERE.md (entry point)
+  ├─→ COMPREHENSIVE_ARCHITECTURE.md (main architecture)
+  │    ├─→ DATA_MODEL.md (deep dive: schema)
+  │    ├─→ DAEMON_ARCHITECTURE.md (deep dive: daemon)
+  │    └─→ ISSUE_AND_AGENT_ARCHITECTURE.md (alternative view)
+  │
+  ├─→ QUICK_REFERENCE.md (lookup while coding)
+  │    └─→ DATA_MODEL.md (for query patterns)
+  │
+  ├─→ DEVELOPER_QUICK_START.md (onboarding)
+  │    └─→ COMPREHENSIVE_ARCHITECTURE.md (study)
+  │
+  └─→ DOCUMENTATION_INDEX.md (browse all docs)
+       ├─→ DATA_MODEL_INDEX.md (FAQ & use cases)
+       └─→ DAEMON_QUICK_REFERENCE.md (daemon fields)
+
+================================================================================
+MAINTENANCE & UPDATES
+================================================================================
+
+These documents are sourced from:
+  ✓ Database migrations (server/migrations/)
+  ✓ Go code (server/internal/, server/pkg/)
+  ✓ Protocol definitions (server/pkg/protocol/)
+  ✓ Frontend types (packages/core/types/)
+  ✓ Configuration files
+
+When source code changes:
+  1. Check which document section is affected
+  2. Update the relevant document
+  3. Run cross-reference checks in other docs
+  4. Update this manifest if new documents created
+
+Last Updated: May 24, 2026 09:12:00 UTC
+Confidence: ✅ HIGH (verified against actual source code)
+
+================================================================================
+SHARING WITH TEAM
+================================================================================
+
+Recommended sharing approach:
+
+1. MANAGERS / NON-TECHNICAL
+   → Share: START_HERE.md → DOCUMENTATION_SUMMARY.md
+
+2. BACKEND ENGINEERS
+   → Share: START_HERE.md → COMPREHENSIVE_ARCHITECTURE.md
+   → Bookmark: QUICK_REFERENCE.md
+
+3. FRONTEND ENGINEERS
+   → Share: START_HERE.md → COMPREHENSIVE_ARCHITECTURE.md (Events section)
+   → Reference: QUICK_REFERENCE.md (Issue/Agent fields)
+
+4. DEVOPS / INFRASTRUCTURE
+   → Share: START_HERE.md → DAEMON_ARCHITECTURE.md (relevant sections)
+
+5. NEW HIRES
+   → Share: START_HERE.md → DEVELOPER_QUICK_START.md
+
+================================================================================
