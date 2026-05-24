@@ -27,6 +27,9 @@ func BuildPrompt(task Task, provider string) string {
 	if task.QuickCreatePrompt != "" {
 		return buildQuickCreatePrompt(task)
 	}
+	if task.PipelineStage != "" {
+		return buildPipelineStagePrompt(task)
+	}
 	var b strings.Builder
 	b.WriteString("You are running as a local coding agent for a Multica workspace.\n\n")
 	fmt.Fprintf(&b, "Your assigned issue ID is: %s\n\n", task.IssueID)
@@ -211,5 +214,84 @@ func buildAutopilotPrompt(task Task) string {
 		b.WriteString("Complete the instructions above.\n")
 	}
 	b.WriteString("Do not run `multica issue get`; this run does not have an issue ID.\n")
+	return b.String()
+}
+
+// buildPipelineStagePrompt constructs a stage-specific prompt for pipeline tasks.
+// Pipeline tasks are part of the "Super Individual" requirement delivery flow.
+func buildPipelineStagePrompt(task Task) string {
+	// Use the orchestrator's prompt builder for detailed stage prompts
+	repoContext := "Conduit blog application (React 18 + Vite + Express 4 + Sequelize + PostgreSQL, monorepo)"
+
+	var b strings.Builder
+	b.WriteString("You are running as a pipeline agent for a requirement delivery flow.\n\n")
+	fmt.Fprintf(&b, "Pipeline Stage: %s\n", task.PipelineStage)
+	if task.PipelineBranch != "" {
+		fmt.Fprintf(&b, "Working Branch: %s\n", task.PipelineBranch)
+	}
+	if task.PipelineVariant != "" {
+		fmt.Fprintf(&b, "Variant: %s\n", task.PipelineVariant)
+	}
+	b.WriteString("\n---\n\n")
+
+	switch task.PipelineStage {
+	case "clarify":
+		b.WriteString("## Task: Requirement Clarification\n\n")
+		b.WriteString("Analyze the assigned issue and produce a structured specification.\n")
+		b.WriteString("If the requirement is ambiguous, list assumptions you're making.\n\n")
+		b.WriteString("Output a structured spec with:\n")
+		b.WriteString("- Summary (1-2 sentences)\n")
+		b.WriteString("- Acceptance Criteria (checklist)\n")
+		b.WriteString("- Technical Scope (frontend/backend/database changes)\n")
+		b.WriteString("- Ambiguities identified\n\n")
+		fmt.Fprintf(&b, "Target: %s\n", repoContext)
+
+	case "plan":
+		b.WriteString("## Task: Technical Planning\n\n")
+		if task.PipelineSpec != "" {
+			fmt.Fprintf(&b, "## Requirement Specification\n%s\n\n", task.PipelineSpec)
+		}
+		b.WriteString("Create an implementation plan with:\n")
+		b.WriteString("1. Implementation steps (ordered)\n")
+		b.WriteString("2. Files to modify (with specific changes)\n")
+		b.WriteString("3. New files to create\n")
+		b.WriteString("4. Risk assessment\n\n")
+		fmt.Fprintf(&b, "Target: %s\n", repoContext)
+
+	case "implement":
+		b.WriteString("## Task: Code Implementation\n\n")
+		if task.PipelineSpec != "" {
+			fmt.Fprintf(&b, "## Requirement\n%s\n\n", task.PipelineSpec)
+		}
+		if task.PipelinePlan != "" {
+			fmt.Fprintf(&b, "## Plan\n%s\n\n", task.PipelinePlan)
+		}
+		b.WriteString("Implement the changes. Rules:\n")
+		b.WriteString("1. Make minimum changes to satisfy requirements\n")
+		b.WriteString("2. Follow existing code patterns\n")
+		b.WriteString("3. Ensure frontend/backend consistency\n")
+		b.WriteString("4. Commit with: feat: [description]\n\n")
+		fmt.Fprintf(&b, "Target: %s\n", repoContext)
+
+	case "validate":
+		b.WriteString("## Task: Validation\n\n")
+		b.WriteString("Run lint and tests on the current code:\n")
+		b.WriteString("1. Run: npx eslint . --ext .js,.jsx 2>&1 | head -50\n")
+		b.WriteString("2. Run: npm test 2>&1 | head -100\n")
+		b.WriteString("3. Report: lint status, test counts, pass rate\n")
+		b.WriteString("4. If failures, attempt to fix (up to 2 attempts)\n")
+
+	case "handoff":
+		b.WriteString("## Task: Create Pull Request\n\n")
+		b.WriteString("Push the branch and create a PR with:\n")
+		b.WriteString("- Clear title\n")
+		b.WriteString("- Summary of changes\n")
+		b.WriteString("- Test results\n")
+	}
+
+	if task.IssueID != "" {
+		fmt.Fprintf(&b, "\n\nStart by running `multica issue get %s --output json` to understand your task context.\n", task.IssueID)
+	}
+
 	return b.String()
 }

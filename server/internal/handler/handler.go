@@ -21,6 +21,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/daemonws"
 	"github.com/multica-ai/multica/server/internal/events"
 	"github.com/multica-ai/multica/server/internal/middleware"
+	"github.com/multica-ai/multica/server/internal/orchestrator"
 	"github.com/multica-ai/multica/server/internal/realtime"
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/storage"
@@ -105,6 +106,7 @@ type Handler struct {
 	WebhookRateLimiter    WebhookRateLimiter
 	WebhookIPRateLimiter  WebhookRateLimiter
 	CloudRuntime          cloudRuntimeProxy
+	Orchestrator          *orchestrator.Orchestrator
 	cfg                   Config
 }
 

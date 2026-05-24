@@ -561,6 +561,17 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				})
 			})
 
+			// Pipeline edges — DAG visualization for the "Super Individual" pipeline.
+			r.Route("/api/pipeline-edges", func(r chi.Router) {
+				r.Get("/", h.ListPipelineEdges)
+				r.Post("/", h.CreatePipelineEdge)
+				r.Route("/{edgeId}", func(r chi.Router) {
+					r.Get("/annotations", h.ListPipelineAnnotations)
+					r.Post("/annotations", h.CreatePipelineAnnotation)
+				})
+			})
+			r.Get("/api/issues/{issueId}/pipeline", h.GetPipelineDAG)
+
 			// Dashboard — workspace-wide token + run-time rollups for the
 			// "/{slug}/dashboard" page. Optional ?project_id filter scopes
 			// the rollup to a single project.

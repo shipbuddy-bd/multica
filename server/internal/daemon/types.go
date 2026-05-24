@@ -61,6 +61,14 @@ type Task struct {
 	QuickCreatePrompt       string          `json:"quick_create_prompt,omitempty"`       // user's natural-language input for quick-create tasks
 	SquadID                 string          `json:"squad_id,omitempty"`                  // when the picker was a squad, the squad's UUID; Agent is still the resolved leader
 	SquadName               string          `json:"squad_name,omitempty"`                // display name for the picker squad, used in prompt text
+	// Pipeline fields — populated from agent_task_queue.context JSONB when task
+	// is part of a pipeline (Super Individual requirement delivery flow).
+	PipelineStage       string `json:"pipeline_stage,omitempty"`        // clarify / plan / implement / validate / handoff
+	PipelineBranch      string `json:"pipeline_branch,omitempty"`       // git branch for this stage
+	PipelineVariant     string `json:"pipeline_variant,omitempty"`      // e.g. "plan-a"
+	PipelineSpec        string `json:"pipeline_spec,omitempty"`         // structured requirement from clarify stage
+	PipelinePlan        string `json:"pipeline_plan,omitempty"`         // implementation plan from plan stage
+	PipelineIssueID     string `json:"pipeline_issue_id,omitempty"`     // root pipeline issue UUID
 	// RequestingUserName + RequestingUserProfileDescription describe the human
 	// the agent is working on behalf of. v1 sources them from the runtime
 	// owner (the user who registered the daemon). Empty when the runtime has

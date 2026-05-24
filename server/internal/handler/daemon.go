@@ -1625,6 +1625,11 @@ func (h *Handler) CompleteTask(w http.ResponseWriter, r *http.Request) {
 
 	h.emitIssueExecutedOnFirstCompletion(r, task)
 
+	// Pipeline orchestration: if this task belongs to a pipeline, advance to next stage.
+	if h.Orchestrator != nil && task != nil {
+		go h.Orchestrator.OnTaskCompleted(context.Background(), task)
+	}
+
 	slog.Info("task completed", "task_id", taskID, "agent_id", uuidToString(task.AgentID))
 	writeJSON(w, http.StatusOK, taskToResponse(*task))
 }
