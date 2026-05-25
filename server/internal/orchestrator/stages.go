@@ -28,6 +28,11 @@ func (o *Orchestrator) onClarifyCompleted(ctx context.Context, task *db.AgentTas
 	variant := "plan-a"
 	branchName := fmt.Sprintf("feat/%s/%s", extractIssuePrefix(parentIssue), variant)
 
+	planNumber, err := o.Queries.IncrementIssueCounter(ctx, parentIssue.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("allocate plan issue number: %w", err)
+	}
+
 	planIssue, err := o.Queries.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID:   parentIssue.WorkspaceID,
 		Title:         fmt.Sprintf("[Plan %s] %s", variant, parentIssue.Title),
@@ -40,6 +45,7 @@ func (o *Orchestrator) onClarifyCompleted(ctx context.Context, task *db.AgentTas
 		CreatorID:     task.AgentID,
 		ParentIssueID: parentIssueID,
 		Position:      2,
+		Number:        planNumber,
 	})
 	if err != nil {
 		return fmt.Errorf("create plan issue: %w", err)
@@ -95,6 +101,11 @@ func (o *Orchestrator) onPlanCompleted(ctx context.Context, task *db.AgentTaskQu
 
 	branchName := fmt.Sprintf("feat/%s/%s/impl", extractIssuePrefix(parentIssue), pctx.Variant)
 
+	implNumber, err := o.Queries.IncrementIssueCounter(ctx, parentIssue.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("allocate impl issue number: %w", err)
+	}
+
 	implIssue, err := o.Queries.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID:   parentIssue.WorkspaceID,
 		Title:         fmt.Sprintf("[Impl %s] %s", pctx.Variant, parentIssue.Title),
@@ -107,6 +118,7 @@ func (o *Orchestrator) onPlanCompleted(ctx context.Context, task *db.AgentTaskQu
 		CreatorID:     task.AgentID,
 		ParentIssueID: parentIssueID,
 		Position:      3,
+		Number:        implNumber,
 	})
 	if err != nil {
 		return fmt.Errorf("create impl issue: %w", err)
@@ -159,6 +171,11 @@ func (o *Orchestrator) onImplementCompleted(ctx context.Context, task *db.AgentT
 	// Validate runs on same branch as implement
 	branchName := pctx.BranchName
 
+	valNumber, err := o.Queries.IncrementIssueCounter(ctx, parentIssue.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("allocate validate issue number: %w", err)
+	}
+
 	valIssue, err := o.Queries.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID:   parentIssue.WorkspaceID,
 		Title:         fmt.Sprintf("[Validate %s] %s", pctx.Variant, parentIssue.Title),
@@ -171,6 +188,7 @@ func (o *Orchestrator) onImplementCompleted(ctx context.Context, task *db.AgentT
 		CreatorID:     task.AgentID,
 		ParentIssueID: parentIssueID,
 		Position:      4,
+		Number:        valNumber,
 	})
 	if err != nil {
 		return fmt.Errorf("create validate issue: %w", err)
@@ -235,6 +253,11 @@ func (o *Orchestrator) onValidateCompleted(ctx context.Context, task *db.AgentTa
 	}
 
 	// Create handoff issue
+	handoffNumber, err := o.Queries.IncrementIssueCounter(ctx, parentIssue.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("allocate handoff issue number: %w", err)
+	}
+
 	handoffIssue, err := o.Queries.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID:   parentIssue.WorkspaceID,
 		Title:         fmt.Sprintf("[Handoff] %s", parentIssue.Title),
@@ -247,6 +270,7 @@ func (o *Orchestrator) onValidateCompleted(ctx context.Context, task *db.AgentTa
 		CreatorID:     task.AgentID,
 		ParentIssueID: parentIssueID,
 		Position:      5,
+		Number:        handoffNumber,
 	})
 	if err != nil {
 		return fmt.Errorf("create handoff issue: %w", err)
