@@ -10,6 +10,43 @@ import (
 
 // --- Pipeline Edge API ---
 
+// PipelineEdgeResponse is the JSON shape returned to clients.
+// Unlike db.PipelineEdge, this serializes Metadata as a parsed JSON object
+// (rather than a base64 []byte), which is what frontend code expects.
+type PipelineEdgeResponse struct {
+	ID            string          `json:"id"`
+	WorkspaceID   string          `json:"workspace_id"`
+	SourceIssueID string          `json:"source_issue_id"`
+	TargetIssueID string          `json:"target_issue_id"`
+	EdgeType      string          `json:"edge_type"`
+	Metadata      json.RawMessage `json:"metadata"`
+	CreatedAt     string          `json:"created_at"`
+}
+
+func toPipelineEdgeResponse(e db.PipelineEdge) PipelineEdgeResponse {
+	meta := e.Metadata
+	if len(meta) == 0 {
+		meta = []byte("{}")
+	}
+	return PipelineEdgeResponse{
+		ID:            uuidToString(e.ID),
+		WorkspaceID:   uuidToString(e.WorkspaceID),
+		SourceIssueID: uuidToString(e.SourceIssueID),
+		TargetIssueID: uuidToString(e.TargetIssueID),
+		EdgeType:      e.EdgeType,
+		Metadata:      meta,
+		CreatedAt:     e.CreatedAt.Time.Format("2006-01-02T15:04:05.000000Z07:00"),
+	}
+}
+
+func toPipelineEdgeResponseList(edges []db.PipelineEdge) []PipelineEdgeResponse {
+	out := make([]PipelineEdgeResponse, 0, len(edges))
+	for _, e := range edges {
+		out = append(out, toPipelineEdgeResponse(e))
+	}
+	return out
+}
+
 type CreatePipelineEdgeRequest struct {
 	SourceIssueID string `json:"source_issue_id"`
 	TargetIssueID string `json:"target_issue_id"`
@@ -63,7 +100,7 @@ func (h *Handler) CreatePipelineEdge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, edge)
+	writeJSON(w, http.StatusCreated, toPipelineEdgeResponse(edge))
 }
 
 func (h *Handler) ListPipelineEdges(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +121,7 @@ func (h *Handler) ListPipelineEdges(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "failed to list edges")
 			return
 		}
-		writeJSON(w, http.StatusOK, edges)
+		writeJSON(w, http.StatusOK, toPipelineEdgeResponseList(edges))
 		return
 	}
 
@@ -93,7 +130,7 @@ func (h *Handler) ListPipelineEdges(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list edges")
 		return
 	}
-	writeJSON(w, http.StatusOK, edges)
+	writeJSON(w, http.StatusOK, toPipelineEdgeResponseList(edges))
 }
 
 // GetPipelineDAG returns the full pipeline DAG for a given root issue.
@@ -104,25 +141,23 @@ func (h *Handler) GetPipelineDAG(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get all edges related to this pipeline
 	edges, err := h.Queries.ListPipelineEdgesByParentIssue(r.Context(), issueID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list edges")
 		return
 	}
 
-	// Get all child issues
 	childIssues, err := h.Queries.ListChildIssues(r.Context(), issueID)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"edges":  edges,
+			"edges":  toPipelineEdgeResponseList(edges),
 			"issues": []any{},
 		})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"edges":  edges,
+		"edges":  toPipelineEdgeResponseList(edges),
 		"issues": childIssues,
 	})
 }
