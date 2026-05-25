@@ -104,6 +104,16 @@ INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, priority, 
 VALUES ($1, $2, NULL, 'queued', $3, $4)
 RETURNING *;
 
+-- name: CreatePipelineTask :one
+-- Pipeline tasks belong to a multi-stage requirement-delivery flow. Like
+-- regular issue tasks they have an issue_id (the checkpoint sub-issue),
+-- but they additionally carry pipeline_issue_id / stage / branch info
+-- in the context JSONB, which the daemon's BuildPrompt dispatches on
+-- via Task.PipelineStage.
+INSERT INTO agent_task_queue (agent_id, runtime_id, issue_id, status, priority, context, trigger_summary)
+VALUES ($1, $2, $3, 'queued', $4, $5, $6)
+RETURNING *;
+
 -- name: LinkTaskToIssue :exec
 -- Attaches the issue a quick-create task produced back to the task row, once
 -- the agent has finished and the issue exists. Guarded by `issue_id IS NULL`

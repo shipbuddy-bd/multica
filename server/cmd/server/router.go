@@ -23,6 +23,7 @@ import (
 	"github.com/multica-ai/multica/server/internal/handler"
 	obsmetrics "github.com/multica-ai/multica/server/internal/metrics"
 	"github.com/multica-ai/multica/server/internal/middleware"
+	"github.com/multica-ai/multica/server/internal/orchestrator"
 	"github.com/multica-ai/multica/server/internal/realtime"
 	"github.com/multica-ai/multica/server/internal/service"
 	"github.com/multica-ai/multica/server/internal/storage"
@@ -143,6 +144,14 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	if opts.DaemonWakeup != nil {
 		h.TaskService.Wakeup = opts.DaemonWakeup
 	}
+	// Wire the pipeline Orchestrator. CompleteTask in handler/daemon.go
+	// calls h.Orchestrator.OnTaskCompleted in a goroutine when this is set,
+	// which advances pipeline state through clarify→plan→implement→validate.
+	h.Orchestrator = orchestrator.New(
+		queries,
+		&orchestrator.QueriesEnqueuer{Queries: queries, Bus: bus},
+		slog.Default(),
+	)
 	if rdb != nil {
 		h.UpdateStore = handler.NewRedisUpdateStore(rdb)
 		h.ModelListStore = handler.NewRedisModelListStore(rdb)
@@ -571,6 +580,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				})
 			})
 			r.Get("/api/issues/{issueId}/pipeline", h.GetPipelineDAG)
+			// Trigger a new pipeline run (creates root issue + clarify checkpoint
+			// + first agent task). Workspace context comes from X-Workspace-ID.
+			r.Post("/api/pipelines/trigger", h.TriggerPipeline)
 
 			// Dashboard — workspace-wide token + run-time rollups for the
 			// "/{slug}/dashboard" page. Optional ?project_id filter scopes

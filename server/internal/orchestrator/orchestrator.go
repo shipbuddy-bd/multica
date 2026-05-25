@@ -149,7 +149,24 @@ func (o *Orchestrator) advanceToNextStage(ctx context.Context, task *db.AgentTas
 func (o *Orchestrator) CreatePipeline(ctx context.Context, params CreatePipelineParams) (*db.Issue, error) {
 	o.Logger.Info("creating pipeline", "title", params.Title, "workspace_id", params.WorkspaceID)
 
-	// 1. Create root issue
+	// Resolve the issue prefix from the workspace if the caller didn't pass one.
+	issuePrefix := params.IssuePrefix
+	if issuePrefix == "" {
+		ws, wsErr := o.Queries.GetWorkspace(ctx, params.WorkspaceID)
+		if wsErr == nil {
+			issuePrefix = ws.IssuePrefix
+		}
+	}
+	if issuePrefix == "" {
+		issuePrefix = "PIPE"
+	}
+
+	// 1. Allocate the issue number for the root issue
+	rootNumber, err := o.Queries.IncrementIssueCounter(ctx, params.WorkspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("allocate root issue number: %w", err)
+	}
+
 	rootIssue, err := o.Queries.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID:  params.WorkspaceID,
 		Title:        params.Title,
@@ -161,7 +178,7 @@ func (o *Orchestrator) CreatePipeline(ctx context.Context, params CreatePipeline
 		CreatorType:  params.CreatorType,
 		CreatorID:    params.CreatorID,
 		Position:     0,
-		Number:       params.Number,
+		Number:       rootNumber,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create root issue: %w", err)
@@ -183,7 +200,12 @@ func (o *Orchestrator) CreatePipeline(ctx context.Context, params CreatePipeline
 	})
 
 	// 2. Create clarify sub-issue
-	clarifyBranch := fmt.Sprintf("feat/%s/clarify/v1", params.IssuePrefix)
+	clarifyBranch := fmt.Sprintf("feat/%s-%d/clarify/v1", issuePrefix, rootNumber)
+
+	clarifyNumber, err := o.Queries.IncrementIssueCounter(ctx, params.WorkspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("allocate clarify issue number: %w", err)
+	}
 
 	clarifyIssue, err := o.Queries.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID:   params.WorkspaceID,
@@ -197,7 +219,7 @@ func (o *Orchestrator) CreatePipeline(ctx context.Context, params CreatePipeline
 		CreatorID:     params.AgentID,
 		ParentIssueID: rootIssue.ID,
 		Position:      1,
-		Number:        params.Number + 1,
+		Number:        clarifyNumber,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create clarify issue: %w", err)
@@ -251,6 +273,9 @@ func (o *Orchestrator) CreatePipeline(ctx context.Context, params CreatePipeline
 }
 
 // CreatePipelineParams holds parameters for creating a new pipeline.
+// IssuePrefix is optional — when empty the orchestrator looks it up from
+// the workspace. Issue numbers are always allocated by the orchestrator
+// via IncrementIssueCounter so the caller never needs to pre-reserve them.
 type CreatePipelineParams struct {
 	WorkspaceID pgtype.UUID
 	AgentID     pgtype.UUID
@@ -258,8 +283,7 @@ type CreatePipelineParams struct {
 	Title       string
 	Description string
 	RepoURL     string
-	IssuePrefix string // e.g. "MUL-42"
-	Number      int32
+	IssuePrefix string
 	CreatorType string
 	CreatorID   pgtype.UUID
 }

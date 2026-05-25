@@ -190,6 +190,15 @@ type AgentTaskResponse struct {
 	// is empty.
 	RequestingUserName               string `json:"requesting_user_name,omitempty"`
 	RequestingUserProfileDescription string `json:"requesting_user_profile_description,omitempty"`
+	// Pipeline fields — present only on tasks that are part of a pipeline
+	// orchestrator run. Populated from agent_task_queue.context JSONB by
+	// taskToResponse so the daemon can dispatch to buildPipelineStagePrompt.
+	PipelineStage   string `json:"pipeline_stage,omitempty"`
+	PipelineBranch  string `json:"pipeline_branch,omitempty"`
+	PipelineVariant string `json:"pipeline_variant,omitempty"`
+	PipelineSpec    string `json:"pipeline_spec,omitempty"`
+	PipelinePlan    string `json:"pipeline_plan,omitempty"`
+	PipelineIssueID string `json:"pipeline_issue_id,omitempty"`
 	Kind                    string                `json:"kind"`                                // discriminator: "comment" | "autopilot" | "chat" | "quick_create" | "direct" — used by the activity row to label tasks that have no linked issue
 }
 
@@ -232,6 +241,20 @@ func taskToResponse(t db.AgentTaskQueue) AgentTaskResponse {
 	if t.WorkDir.Valid {
 		workDir = t.WorkDir.String
 	}
+	// Parse pipeline fields out of the task's Context JSONB. Non-pipeline
+	// tasks have an empty/non-pipeline-shaped context so the keys just stay
+	// at zero values and the omitempty json tags keep them off the wire.
+	var pipelineCtx struct {
+		PipelineIssueID string `json:"pipeline_issue_id"`
+		Stage           string `json:"stage"`
+		Variant         string `json:"variant"`
+		BranchName      string `json:"branch_name"`
+		SpecContent     string `json:"spec_content"`
+		PlanContent     string `json:"plan_content"`
+	}
+	if len(t.Context) > 0 {
+		_ = json.Unmarshal(t.Context, &pipelineCtx)
+	}
 	return AgentTaskResponse{
 		ID:               uuidToString(t.ID),
 		AgentID:          uuidToString(t.AgentID),
@@ -255,9 +278,15 @@ func taskToResponse(t db.AgentTaskQueue) AgentTaskResponse {
 		// Surface task source so the UI can distinguish issue-linked tasks
 		// from chat-spawned or autopilot-spawned ones; all three may arrive
 		// with issue_id = "" once a task has no linked issue.
-		ChatSessionID:  uuidToString(t.ChatSessionID),
-		AutopilotRunID: uuidToString(t.AutopilotRunID),
-		Kind:           computeTaskKind(t),
+		ChatSessionID:   uuidToString(t.ChatSessionID),
+		AutopilotRunID:  uuidToString(t.AutopilotRunID),
+		PipelineStage:   pipelineCtx.Stage,
+		PipelineBranch:  pipelineCtx.BranchName,
+		PipelineVariant: pipelineCtx.Variant,
+		PipelineSpec:    pipelineCtx.SpecContent,
+		PipelinePlan:    pipelineCtx.PlanContent,
+		PipelineIssueID: pipelineCtx.PipelineIssueID,
+		Kind:            computeTaskKind(t),
 	}
 }
 

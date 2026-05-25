@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/multica-ai/multica/server/internal/orchestrator"
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
@@ -224,4 +226,112 @@ func (h *Handler) ListPipelineAnnotations(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, annotations)
+}
+
+// --- Pipeline Trigger API ---
+
+// TriggerPipelineRequest is the body of POST /api/pipelines/trigger.
+// repo_url falls back to the workspace's first configured repo when empty,
+// so the simplest payload is just {title, agent_id}.
+type TriggerPipelineRequest struct {
+	Title       string `json:"title"`
+	Description string `json:"description,omitempty"`
+	AgentID     string `json:"agent_id"`
+	RuntimeID   string `json:"runtime_id,omitempty"`
+	RepoURL     string `json:"repo_url,omitempty"`
+}
+
+// TriggerPipeline starts a new pipeline orchestrator run. It creates a root
+// issue + a clarify checkpoint sub-issue, links them with a pipeline_edge,
+// and enqueues the first agent task. Subsequent stages advance automatically
+// when CompleteTask fires Orchestrator.OnTaskCompleted.
+func (h *Handler) TriggerPipeline(w http.ResponseWriter, r *http.Request) {
+	if h.Orchestrator == nil {
+		writeError(w, http.StatusServiceUnavailable, "pipeline orchestrator not configured")
+		return
+	}
+
+	workspaceID := workspaceIDFromURL(r, "id")
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace_id")
+	if !ok {
+		return
+	}
+
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	userUUID, ok := parseUUIDOrBadRequest(w, userID, "user_id")
+	if !ok {
+		return
+	}
+
+	var req TriggerPipelineRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+	agentUUID, ok := parseUUIDOrBadRequest(w, req.AgentID, "agent_id")
+	if !ok {
+		return
+	}
+
+	// Runtime is optional — daemon can claim by agent if no specific runtime
+	// is pinned. When provided, it must be a valid UUID.
+	var runtimeUUID pgtype.UUID
+	if req.RuntimeID != "" {
+		ru, ok := parseUUIDOrBadRequest(w, req.RuntimeID, "runtime_id")
+		if !ok {
+			return
+		}
+		runtimeUUID = ru
+	}
+
+	// Resolve repo URL: explicit body field wins; otherwise pull the first
+	// repo from the workspace's repos JSONB column.
+	repoURL := req.RepoURL
+	if repoURL == "" {
+		ws, err := h.Queries.GetWorkspace(r.Context(), wsUUID)
+		if err == nil && len(ws.Repos) > 0 {
+			repoURL = firstRepoURL(ws.Repos)
+		}
+	}
+
+	rootIssue, err := h.Orchestrator.CreatePipeline(r.Context(), orchestrator.CreatePipelineParams{
+		WorkspaceID: wsUUID,
+		AgentID:     agentUUID,
+		RuntimeID:   runtimeUUID,
+		Title:       req.Title,
+		Description: req.Description,
+		RepoURL:     repoURL,
+		CreatorType: "member",
+		CreatorID:   userUUID,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to start pipeline: "+err.Error())
+		return
+	}
+
+	prefix := h.getIssuePrefix(r.Context(), wsUUID)
+	resp := issueToResponse(*rootIssue, prefix)
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"root_issue": resp,
+	})
+}
+
+// firstRepoURL extracts the first repo URL from a workspace's repos JSONB.
+// The shape is [{"url": "...", "description": "..."}, ...]; we only need the URL.
+// Returns empty string when the JSON is malformed or the array is empty.
+func firstRepoURL(repos []byte) string {
+	var arr []struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(repos, &arr); err != nil || len(arr) == 0 {
+		return ""
+	}
+	return arr[0].URL
 }
