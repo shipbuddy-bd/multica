@@ -4,9 +4,12 @@
 
 | 文件 | 说明 |
 |------|------|
-| **[super-individual-design.md](./super-individual-design.md)** | 核心设计文档（系统架构、六阶段设计、数据模型、开发计划） |
+| **[HANDOVER-2026-05-25.md](./HANDOVER-2026-05-25.md)** | **交接文档**：当前进度、剩余工作、关键路径、凭据备忘 |
+| [super-individual-design.md](./super-individual-design.md) | 核心设计文档（系统架构、六阶段设计、数据模型、开发计划） |
 | [要求文档.md](./要求文档.md) | 课题官方要求（评分标准、时间节点、练手题） |
 | [Q&A.md](./Q&A.md) | 课题启动会答疑记录 |
+| [ORCHESTRATOR_INTEGRATION_CHECKLIST.md](./ORCHESTRATOR_INTEGRATION_CHECKLIST.md) | Orchestrator 接入点速查 |
+| [TASK_COMPLETION_FLOW.md](./TASK_COMPLETION_FLOW.md) | 任务完成事件链路追踪 |
 
 ## 文档结构
 
@@ -47,6 +50,7 @@ docs/
 
 ## 快速入口
 
+- **要接手干活** → 先读 `HANDOVER-2026-05-25.md`
 - **要理解整体方案** → 读 `super-individual-design.md` 的 §一 ~ §五
 - **要开始开发** → 读 §十四（实施计划）+ §十五（文件清单）
 - **要理解数据模型** → 读 §六（含现有 Task 机制分析）
