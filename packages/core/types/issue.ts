@@ -24,13 +24,14 @@ export interface IssueReaction {
 
 /**
  * Per-issue metadata is a flat KV map agents use to record pipeline state
- * (PR number, pipeline_status, waiting_on, ...). Values are primitives only —
- * string / number / bool — enforced by both the API and the DB. Always
- * present in responses (empty object when unset) so reads don't need a
- * nil guard on the parent field.
+ * (PR number, pipeline_status, waiting_on, ...). Values are primitives, plus
+ * the nested `pipeline` object used by the Super Individual orchestrator
+ * (see types/pipeline.ts → PipelineCheckpointMeta). Always present in
+ * responses (empty object when unset) so reads don't need a nil guard on
+ * the parent field.
  */
-export type IssueMetadataValue = string | number | boolean;
-export type IssueMetadata = Record<string, IssueMetadataValue>;
+export type IssueMetadataValue = string | number | boolean | unknown;
+export type IssueMetadata = Record<string, unknown>;
 
 export interface Issue {
   id: string;

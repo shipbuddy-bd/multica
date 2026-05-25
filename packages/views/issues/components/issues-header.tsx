@@ -12,6 +12,7 @@ import {
   Filter,
   FolderKanban,
   FolderMinus,
+  GitBranch,
   List,
   SignalHigh,
   SlidersHorizontal,
@@ -940,6 +941,8 @@ export function IssueDisplayControls({
                           <Columns3 className="size-4" />
                         ) : viewMode === "gantt" && allowGantt ? (
                           <ChartGantt className="size-4" />
+                        ) : viewMode === "pipeline" ? (
+                          <GitBranch className="size-4" />
                         ) : (
                           <List className="size-4" />
                         )}
@@ -973,6 +976,10 @@ export function IssueDisplayControls({
                     {t(($) => $.view.gantt)}
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem onClick={() => act.setViewMode("pipeline")}>
+                  <GitBranch />
+                  Pipeline
+                </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>

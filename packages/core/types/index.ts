@@ -127,3 +127,18 @@ export type {
   SquadMemberStatus,
   SquadMemberStatusListResponse,
 } from "./squad";
+
+export type {
+  PipelineStage,
+  PipelineEdgeType,
+  PipelineAnnotationType,
+  PipelineScore,
+  PipelineEdgeMetadata,
+  PipelineEdge,
+  PipelineAnnotation,
+  PipelineCheckpointMeta,
+  PipelineDAG,
+  CreatePipelineEdgeRequest,
+  CreatePipelineAnnotationRequest,
+} from "./pipeline";
+export { parseEdgeMetadata } from "./pipeline";

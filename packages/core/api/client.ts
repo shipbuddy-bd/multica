@@ -39,6 +39,11 @@ import type {
   PersonalAccessToken,
   CreatePersonalAccessTokenRequest,
   CreatePersonalAccessTokenResponse,
+  PipelineEdge,
+  PipelineAnnotation,
+  PipelineDAG,
+  CreatePipelineEdgeRequest,
+  CreatePipelineAnnotationRequest,
   RuntimeUsage,
   IssueUsageSummary,
   RuntimeHourlyActivity,
@@ -1291,6 +1296,37 @@ export class ApiClient {
 
   async createPersonalAccessToken(data: CreatePersonalAccessTokenRequest): Promise<CreatePersonalAccessTokenResponse> {
     return this.fetch("/api/tokens", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Pipeline Edges (Super Individual)
+  async listPipelineEdges(parentIssueId?: string): Promise<PipelineEdge[]> {
+    const qs = parentIssueId ? `?parent_issue_id=${parentIssueId}` : "";
+    return this.fetch(`/api/pipeline-edges${qs}`);
+  }
+
+  async createPipelineEdge(data: CreatePipelineEdgeRequest): Promise<PipelineEdge> {
+    return this.fetch("/api/pipeline-edges", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getPipelineDAG(issueId: string): Promise<PipelineDAG> {
+    return this.fetch(`/api/issues/${issueId}/pipeline`);
+  }
+
+  async listPipelineAnnotations(edgeId: string): Promise<PipelineAnnotation[]> {
+    return this.fetch(`/api/pipeline-edges/${edgeId}/annotations`);
+  }
+
+  async createPipelineAnnotation(
+    edgeId: string,
+    data: CreatePipelineAnnotationRequest,
+  ): Promise<PipelineAnnotation> {
+    return this.fetch(`/api/pipeline-edges/${edgeId}/annotations`, {
       method: "POST",
       body: JSON.stringify(data),
     });

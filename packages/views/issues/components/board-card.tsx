@@ -291,6 +291,7 @@ export const DraggableBoardCard = memo(function DraggableBoardCard({ issue, chil
         style={style}
         {...attributes}
         {...listeners}
+        data-issue-id={issue.id}
         className={`group/card ${isDragging ? "opacity-30" : ""}`}
       >
         <AppLink
